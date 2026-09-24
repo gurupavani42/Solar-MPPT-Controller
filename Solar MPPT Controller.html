@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar MPPT Controller</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #eef7ff;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 750px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 0 12px #aaa;
+        }
+
+        h1 {
+            color: #222;
+        }
+
+        .sun {
+            font-size: 70px;
+        }
+
+        .control {
+            background: #f4f4f4;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 10px;
+        }
+
+        input {
+            width: 80%;
+        }
+
+        .values {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .card {
+            background: #e8f1f8;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .card h3 {
+            margin: 5px;
+        }
+
+        .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        button {
+            padding: 12px 25px;
+            margin: 10px;
+            border: none;
+            border-radius: 6px;
+            background: #1976d2;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0d47a1;
+        }
+
+        #status {
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .bar {
+            width: 100%;
+            height: 25px;
+            background: #ddd;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        #powerBar {
+            width: 0%;
+            height: 100%;
+            background: #35b84a;
+            transition: width 0.5s;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>☀ Solar MPPT Controller</h1>
+
+    <div class="sun">☀</div>
+
+    <p>
+        Maximum Power Point Tracking Simulation
+    </p>
+
+    <!-- Solar Input -->
+    <div class="control">
+
+        <h3>Solar Irradiance</h3>
+
+        <input
+            type="range"
+            id="irradiance"
+            min="0"
+            max="100"
+            value="80"
+            oninput="updateSystem()"
+        >
+
+        <p>
+            Irradiance:
+            <strong id="irradianceValue">80%</strong>
+        </p>
+
+    </div>
+
+    <!-- Voltage Control -->
+    <div class="control">
+
+        <h3>Panel Operating Voltage</h3>
+
+        <input
+            type="range"
+            id="voltage"
+            min="10"
+            max="30"
+            value="20"
+            oninput="updateSystem()"
+        >
+
+        <p>
+            Voltage:
+            <strong id="voltageValue">20 V</strong>
+        </p>
+
+    </div>
+
+    <button onclick="startMPPT()">Start MPPT</button>
+    <button onclick="stopMPPT()">Stop MPPT</button>
+
+    <!-- Values -->
+    <div class="values">
+
+        <div class="card">
+            <h3>Panel Voltage</h3>
+            <div class="value" id="panelVoltage">20 V</div>
+        </div>
+
+        <div class="card">
+            <h3>Panel Current</h3>
+            <div class="value" id="panelCurrent">6 A</div>
+        </div>
+
+        <div class="card">
+            <h3>Solar Power</h3>
+            <div class="value" id="solarPower">120 W</div>
+        </div>
+
+        <div class="card">
+            <h3>MPPT Power</h3>
+            <div class="value" id="mpptPower">120 W</div>
+        </div>
+
+    </div>
+
+    <div class="control">
+
+        <h3>Power Output</h3>
+
+        <div class="bar">
+            <div id="powerBar"></div>
+        </div>
+
+        <p>
+            MPPT Efficiency:
+            <strong id="efficiency">0%</strong>
+        </p>
+
+        <p>
+            Status:
+            <span id="status">Stopped</span>
+        </p>
+
+    </div>
+
+</div>
+
+
+<script>
+
+let mpptRunning = false;
+let timer;
+
+
+// Update system values
+function updateSystem() {
+
+    let irradiance =
+        Number(document.getElementById("irradiance").value);
+
+    let voltage =
+        Number(document.getElementById("voltage").value);
+
+    document.getElementById("irradianceValue").innerText =
+        irradiance + "%";
+
+    document.getElementById("voltageValue").innerText =
+        voltage + " V";
+
+    document.getElementById("panelVoltage").innerText =
+        voltage + " V";
+
+    // Calculate current based on irradiance
+    let current = (irradiance / 100) * 7.5;
+
+    document.getElementById("panelCurrent").innerText =
+        current.toFixed(2) + " A";
+
+    // Calculate power
+    let power = voltage * current;
+
+    document.getElementById("solarPower").innerText =
+        power.toFixed(2) + " W";
+
+    // Display power bar
+    let percentage = Math.min((power / 225) * 100, 100);
+
+    document.getElementById("powerBar").style.width =
+        percentage + "%";
+}
+
+
+// Start MPPT
+function startMPPT() {
+
+    if (mpptRunning) {
+        return;
+    }
+
+    mpptRunning = true;
+
+    document.getElementById("status").innerText =
+        "MPPT Running";
+
+    timer = setInterval(function() {
+
+        let irradiance =
+            Number(document.getElementById("irradiance").value);
+
+        /*
+           Simple MPPT simulation:
+           The controller tries to move the
+           panel voltage toward the assumed
+           maximum-power voltage.
+        */
+
+        let targetVoltage = 20;
+
+        let voltage =
+            Number(document.getElementById("voltage").value);
+
+        if (voltage < targetVoltage) {
+            voltage++;
+        }
+        else if (voltage > targetVoltage) {
+            voltage--;
+        }
+
+        document.getElementById("voltage").value =
+            voltage;
+
+        updateSystem();
+
+        // Calculate MPPT current and power
+        let mpptCurrent =
+            (irradiance / 100) * 7.5;
+
+        let mpptPower =
+            targetVoltage * mpptCurrent;
+
+        document.getElementById("mpptPower").innerText =
+            mpptPower.toFixed(2) + " W";
+
+        // Efficiency
+        let efficiency = 95;
+
+        document.getElementById("efficiency").innerText =
+            efficiency + "%";
+
+    }, 500);
+}
+
+
+// Stop MPPT
+function stopMPPT() {
+
+    mpptRunning = false;
+
+    clearInterval(timer);
+
+    document.getElementById("status").innerText =
+        "MPPT Stopped";
+}
+
+
+// Initial display
+updateSystem();
+
+</script>
+
+</body>
+</html>
